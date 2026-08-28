@@ -1,5 +1,3 @@
-# .github/workflows/edge-deploy.yml
-# Pipeline completo: lint → testes → build ARM64 → quality gate → deploy
 name: Edge AI — Build, Test e Deploy
 
 on:
@@ -13,9 +11,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}/yolo-api
 
 jobs:
-  # ─────────────────────────────────────────────────────────
-  # JOB 1: Lint e testes unitários / smoke / integration
-  # ─────────────────────────────────────────────────────────
   test:
     name: "Lint & Tests"
     runs-on: ubuntu-latest
@@ -60,9 +55,6 @@ jobs:
       - name: Testes automatizados
         run: pytest tests/ -v --tb=short
 
-  # ─────────────────────────────────────────────────────────
-  # JOB 2: Build da imagem Docker multi-arquitetura
-  # ─────────────────────────────────────────────────────────
   build:
     name: "Build & Push (ARM64)"
     needs: test
@@ -111,9 +103,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ─────────────────────────────────────────────────────────
-  # JOB 3: Quality gate do modelo
-  # ─────────────────────────────────────────────────────────
   model-gate:
     name: "Model Quality Gate"
     needs: build
@@ -140,4 +129,44 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.RPI_SSH_KEY }}" | tr -d '\r' > ~/.ssh/dvc_key
-          chmod 600
+          chmod 600 ~/.ssh/dvc_key
+          dvc remote modify --local local_remote keyfile ~/.ssh/dvc_key
+          dvc pull
+
+      - name: Executar quality gate (mAP@0.5 >= 0.50)
+        run: python scripts/validate_model.py --threshold 0.50
+
+  deploy:
+    name: "Deploy → Raspberry Pi 5"
+    needs: model-gate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Conecta à rede Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy via SSH com rollback automático
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.RPI_HOST }}
+          username: ${{ secrets.RPI_USER }}
+          key: ${{ secrets.RPI_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            export DEPLOY_PATH=${{ secrets.RPI_DEPLOY_PATH }}
+            cd $DEPLOY_PATH
+            git pull origin main
+            bash scripts/deploy.sh
+
+      - name: Notificar resultado
+        if: always()
+        run: |
+          echo "Deploy status: ${{ job.status }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
