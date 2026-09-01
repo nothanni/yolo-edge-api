@@ -22,13 +22,13 @@ PREVIOUS=$(docker inspect yolo-api \
   --format '{{.Config.Image}}' 2>/dev/null || echo "none")
 echo "[INFO] Imagem atual: $PREVIOUS"
 
-# ── Baixa a nova imagem ──────────────────────────────────────
 echo "[1/4] Baixando nova imagem..."
 docker compose pull
+python3 -m dvc pull models/yolo-epi.pt
 
 # ── Sobe a nova versão ───────────────────────────────────────
 echo "[2/4] Iniciando nova versão..."
-docker compose up -d
+docker compose up -d --build
 
 # ── Aguarda o serviço estabilizar ────────────────────────────
 echo "[3/4] Aguardando health check ($((HEALTH_RETRIES * HEALTH_WAIT))s max)..."
