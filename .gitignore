@@ -16,3 +16,9 @@ images/
 
 # Variáveis de ambiente locais
 .env
+preprocessing/outputs/
+runs/
+resultados_completos.txt
+*.mp4
+*.avi
+*.zip
