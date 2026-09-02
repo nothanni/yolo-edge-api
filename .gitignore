@@ -23,3 +23,7 @@ resultados_completos.txt
 *.avi
 *.zip
 baixar_dataset.py
+
+# Pesos genéricos baixados automaticamente pelo Ultralytics
+yolov8n.pt
+weights/
