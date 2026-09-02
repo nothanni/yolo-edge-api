@@ -12,7 +12,7 @@ services:
       - ./output:/app/output
       - ./images:/app/images:ro
     environment:
-      - MODEL_NAME=yolov8n.pt
+      - MODEL_NAME=yolo-epi.pt
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
